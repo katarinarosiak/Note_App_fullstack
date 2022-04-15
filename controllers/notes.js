@@ -1,6 +1,16 @@
 const User = require('../models/user')
 const notesRouter = require('express').Router()
 const Note = require('../models/note')
+const jwt = require('jsonwebtoken')
+
+const getTokenFrom = request => {
+  const authorization = request.get('authorization')
+  if (authorization && authorization.toLowerCase().startsWith('bearer ')) {
+    return authorization.substring(7)
+  }
+  return null
+}
+
 
 notesRouter.get('/', async (request, response) => {
 	const notes = await Note
@@ -16,24 +26,17 @@ notesRouter.get('/:id', async (request, response, next) => {
 		} else {
 			response.status(404).end()
 		}
-
-
-  // Note.findById(request.params.id)
-  //   .then(note => {
-  //     if (note) {
-  //       response.json(note)
-  //     } else {
-  //       response.status(404).end()
-  //     }
-  //   })
-  //   .catch(error => next(error))
 })
 
 notesRouter.post('/', async (request, response, next) => {
   const body = request.body
 
-	//get the user with the id
-	const user = await User.findById(body.userId)
+  const token = getTokenFrom(request)
+  const decodedToken = jwt.verify(token, process.env.SECRET)
+  if (!decodedToken.id) {
+    return response.status(401).json({ error: 'token missing or invalid' })
+  }
+  const user = await User.findById(decodedToken.id)
 
   const note = new Note({
     content: body.content,
@@ -52,12 +55,6 @@ notesRouter.post('/', async (request, response, next) => {
 notesRouter.delete('/:id', async (request, response, next) => {
 		await Note.findByIdAndRemove(request.params.id)
 		response.status(204).end()
-
- // Note.findByIdAndRemove(request.params.id)
-  //   .then(() => {
-  //     response.status(204).end()
-  //   })
-  //   .catch(error => next(error))
 })
 
 
@@ -70,16 +67,6 @@ notesRouter.put('/:id', async (request, response, next) => {
 			{ new: true, runValidators: true, context: 'query' }
 		)
 		response.json(updatedNote)
-
-//   Note.findByIdAndUpdate(
-//     request.params.id, 
-//     { content, important },
-//     { new: true, runValidators: true, context: 'query' }
-//   ) 
-//     .then(updatedNote => {
-//       response.json(updatedNote)
-//     })
-//     .catch(error => next(error))
 })
 
 module.exports = notesRouter
